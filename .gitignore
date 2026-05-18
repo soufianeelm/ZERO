@@ -1,0 +1,14 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# STM32CubeIDE
+Debug/
+Release/
+*.elf
+*.bin
+*.hex
+
+# VS Code
+.vscode/
