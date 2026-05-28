@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "imu_data.hpp"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,7 +54,24 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
+/* Queue handle */
+osMessageQueueId_t imuQueueHandle;
 
+/* SensorTask variables */
+osThreadId_t sensorTaskHandle;
+const osThreadAttr_t sensorTask_attributes = {
+  .name = "SensorTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+
+/* UartTask variables */
+osThreadId_t uartTaskHandle;
+const osThreadAttr_t uartTask_attributes = {
+  .name = "UartTask",
+  .stack_size = 128 * 8,
+  .priority = (osPriority_t) osPriorityNormal,
+};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -64,6 +81,8 @@ static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_IWDG_Init(void);
 void StartDefaultTask(void *argument);
+void SensorTask(void *argument);
+void UartTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -126,7 +145,7 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+  imuQueueHandle = osMessageQueueNew(8, sizeof(imu_data), NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -134,7 +153,10 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  /*creation of sensorTask */
+  sensorTaskHandle = osThreadNew(SensorTask, NULL, &sensorTask_attributes);
+  /*creation of uartTask */
+  uartTaskHandle = osThreadNew(UartTask, NULL, &uartTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -322,7 +344,34 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+/* SensorTask function definition */
+void SensorTask(void *argument)
+{
+	for(;;)
+	{
+		HAL_IWDG_Refresh(&hiwdg);
 
+		imu_data data{};
+		data.timestamp = HAL_GetTick();
+
+		osMessageQueuePut(imuQueueHandle, &data, 0, 0);
+
+		osDelay(10);
+	}
+}
+
+/* UartTask function definition */
+void UartTask(void *argument)
+{
+	for(;;)
+	{
+		imu_data data;
+
+		osMessageQueueGet(imuQueueHandle, &data, NULL, osWaitForever);
+
+		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+	}
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
