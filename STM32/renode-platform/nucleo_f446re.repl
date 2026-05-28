@@ -1,0 +1,65 @@
+using "platforms/cpus/stm32f4.repl"
+
+// --- STM32F446RE accurate overrides ---
+
+// Cortex-M4F — FPU present on F446RE
+cpu:
+    cpuType: "cortex-m4f"
+
+// Flash: 512 KB
+flash:
+    size: 0x80000
+
+// SRAM: 128 KB total (SRAM1 112 KB at 0x20000000 + SRAM2 16 KB at 0x2001C000, contiguous)
+sram:
+    size: 0x20000
+
+// SysTick driven by HCLK = 84 MHz (HSI 16 MHz -> PLL M=16 N=336 P=4 -> 84 MHz)
+nvic:
+    systickFrequency: 84000000
+
+// All timers at 84 MHz
+// APB1 timers (TIM2-7, TIM12-14): APB1=42 MHz, prescaler>1 -> timer clock = 2x42 = 84 MHz
+// APB2 timers (TIM1, TIM8-11):    APB2=84 MHz, prescaler=1 -> timer clock = 84 MHz
+timer1:
+    frequency: 84000000
+timer2:
+    frequency: 84000000
+timer3:
+    frequency: 84000000
+timer4:
+    frequency: 84000000
+timer5:
+    frequency: 84000000
+timer6:
+    frequency: 84000000
+timer7:
+    frequency: 84000000
+timer8:
+    frequency: 84000000
+timer9:
+    frequency: 84000000
+timer10:
+    frequency: 84000000
+timer11:
+    frequency: 84000000
+timer12:
+    frequency: 84000000
+timer13:
+    frequency: 84000000
+timer14:
+    frequency: 84000000
+
+// Note: the Ethernet peripheral from stm32f4.repl is still present (STM32F446RE has no
+// Ethernet). It cannot be removed via override syntax without rewriting the full platform
+// from scratch. It is harmless — the firmware never accesses that address range.
+
+// --- NUCLEO-F446RE board peripherals ---
+
+UserButton: Miscellaneous.Button @ gpioPortC
+    -> gpioPortC@13
+
+UserLED: Miscellaneous.LED @ gpioPortA
+
+gpioPortA:
+    5 -> UserLED@0

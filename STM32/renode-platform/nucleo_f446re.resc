@@ -1,0 +1,12 @@
+mach create "nucleo-f446re"
+machine LoadPlatformDescription @C:\Users\selmo\Documents\ZERO\STM32\renode-platform\nucleo_f446re.repl
+sysbus LoadELF @C:\Users\selmo\Documents\ZERO\STM32\zero-firmware\Debug\zero-firmware.elf
+showAnalyzer usart2
+
+macro reset
+"""
+    sysbus LoadELF @C:\Users\selmo\Documents\ZERO\STM32\zero-firmware\Debug\zero-firmware.elf
+"""
+runMacro $reset
+
+start
