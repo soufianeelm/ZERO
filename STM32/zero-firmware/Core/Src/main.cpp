@@ -23,6 +23,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "imu_data.hpp"
+#include <cstdlib>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,10 +58,12 @@ const osThreadAttr_t defaultTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
-/* Queue handle */
 osMessageQueueId_t imuQueueHandle;
 
-/* SensorTask variables */
+/* DMA UART TX Semaphore handle */
+osSemaphoreId_t uartTxSemHandle;
+
+/* Definitions for SensorTask */
 osThreadId_t sensorTaskHandle;
 const osThreadAttr_t sensorTask_attributes = {
   .name = "SensorTask",
@@ -65,7 +71,7 @@ const osThreadAttr_t sensorTask_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
 };
 
-/* UartTask variables */
+/* Definitions for UartTask */
 osThreadId_t uartTaskHandle;
 const osThreadAttr_t uartTask_attributes = {
   .name = "UartTask",
@@ -81,11 +87,10 @@ static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_IWDG_Init(void);
 void StartDefaultTask(void *argument);
-void SensorTask(void *argument);
-void UartTask(void *argument);
 
 /* USER CODE BEGIN PFP */
-
+void SensorTask(void *argument);
+void UartTask(void *argument);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -146,6 +151,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_QUEUES */
   imuQueueHandle = osMessageQueueNew(8, sizeof(imu_data), NULL);
+  uartTxSemHandle = osSemaphoreNew(1, 1, NULL);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -153,9 +159,9 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /*creation of sensorTask */
+  /* creation of sensorTask */
   sensorTaskHandle = osThreadNew(SensorTask, NULL, &sensorTask_attributes);
-  /*creation of uartTask */
+  /* creation of uartTask */
   uartTaskHandle = osThreadNew(UartTask, NULL, &uartTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
@@ -344,32 +350,88 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-/* SensorTask function definition */
+/**
+  * @brief  Generate a random float in [-range, +range] for mock sensor noise
+  * @param  range Maximum absolute value of the output
+  * @retval float in [-range, +range]
+  */
+static float randomNoise(float range)
+{
+  return ((float)rand() / RAND_MAX) * 2.0f * range - range;
+}
+
+/**
+  * @brief  Check that IMU data falls within MPU-6050 physical sensor limits
+  * @param  data IMU data to validate (accel ±16g, gyro ±2000°/s)
+  * @retval true if all axes are within range, false otherwise
+  */
+static bool imu_data_valid(const imu_data& data)
+{
+	return fabsf(data.ax) <= 16.0f && fabsf(data.ay) <= 16.0f && fabsf(data.az) <= 16.0f &&
+			fabsf(data.gx) <= 2000.0f && fabsf(data.gy) <= 2000.0f && fabsf(data.gz) <= 2000.0f;
+}
+
+/**
+  * @brief  UART TX DMA completion callback — releases the TX semaphore to unblock UartTask
+  * @param  huart UART handle that triggered the callback
+  * @retval None
+  */
+extern "C" void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART2) {
+        osSemaphoreRelease(uartTxSemHandle);
+    }
+}
+
+/**
+  * @brief  Kick IWDG, generate mock IMU data, validate it, and push to queue every 10 ms
+  * @param  argument Not used
+  * @retval None
+  */
 void SensorTask(void *argument)
 {
 	for(;;)
 	{
 		HAL_IWDG_Refresh(&hiwdg);
 
-		imu_data data{};
+		imu_data data{randomNoise(0.02f),
+									randomNoise(0.02f),
+									1.0f + randomNoise(0.02f),
+									randomNoise(0.1f),
+									randomNoise(0.1f),
+									randomNoise(0.1f)};
 		data.timestamp = HAL_GetTick();
 
-		osMessageQueuePut(imuQueueHandle, &data, 0, 0);
+		if(imu_data_valid(data))
+		{
+			osMessageQueuePut(imuQueueHandle, &data, 0, 0);
+		}
 
 		osDelay(10);
 	}
 }
 
-/* UartTask function definition */
+/**
+  * @brief  Receive IMU data from queue and transmit it over UART2 via DMA
+  * @param  argument Not used
+  * @retval None
+  */
 void UartTask(void *argument)
 {
 	for(;;)
 	{
 		imu_data data;
 
+		static char buf[128];
+
 		osMessageQueueGet(imuQueueHandle, &data, NULL, osWaitForever);
 
-		HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+		osSemaphoreAcquire(uartTxSemHandle, osWaitForever);
+
+		snprintf(buf, sizeof(buf), "ax = %.2f, ay = %.2f, az = %.2f, gx = %.2f, gy = %.2f, gz = %.2f, TS = %lu\n",
+																			data.ax, data.ay, data.az, data.gx, data.gy, data.gz, data.timestamp);
+
+		/* what to do if HAL_BUSY or HAL_ERROR */
+		HAL_UART_Transmit_DMA(&huart2, (uint8_t*)buf, strlen(buf));
 	}
 }
 /* USER CODE END 4 */
