@@ -10,10 +10,11 @@
 | Day 2 | Environment setup (Git, Python venv, STM32CubeIDE, Renode) + CV update | ✅ Done |
 | Day 3 | Phase 1 — CubeMX config, project setup, C++17 build (Milestones 1–3) | ✅ Done |
 | Day 4 | Phase 1 — FreeRTOS tasks, queue, IWDG kick, Renode validation (Milestone 4) | ✅ Done |
-| Day 5 | Phase 1 — Mock IMU data generation, DMA UART transmission | ⬜ Next |
+| Day 5 | Phase 1 — Mock IMU data, sanity checks, DMA UART TX with semaphore | ✅ Done |
+| Day 6 | Phase 1 — Replace snprintf/float with binary packet protocol, make buf static | ⬜ Next |
 
 **Current phase:** Phase 1 — Foundations  
-**Next session:** Replace zeroed `imu_data{}` placeholder with realistic mock IMU data generation, then implement DMA UART transmission in UartTask
+**Next session:** Replace `snprintf` + `%f` formatting with a binary packet protocol (fixed header, raw bytes, checksum). Make `buf[128]` static to move it off the stack.
 
 ---
 
@@ -162,9 +163,42 @@ It is a scheduling library compiled into the same binary as the application. The
 **Renode commands to know**
 `pause` / `start`, `cpu PC`, `machine GetTimeSourceInfo`, `mach clear` (reset simulation without closing Renode), `include @path/to/script.resc`
 
+**DMA UART TX callback requires USART2 global interrupt enabled**
+`HAL_UART_TxCpltCallback` in DMA normal mode uses a two-interrupt chain: DMA1_Stream6 fires first, enables TCIE, then USART2 TC fires to call the callback. Without enabling USART2 global interrupt in CubeMX, the chain never completes and the callback never fires.
+
+**CubeMX regeneration wipes anything outside USER CODE blocks**
+Function prototypes, declarations, includes — anything outside `/* USER CODE BEGIN */` / `/* USER CODE END */` markers gets erased on regeneration. Always place your declarations inside the markers.
+
+**`snprintf` with `%f` is stack-heavy — avoid in embedded**
+Six `%f` conversions use large internal stack buffers. Exceeded the 1024-byte UartTask stack causing a system freeze caught by the IWDG. Fixed by increasing stack to 2048 bytes. Long-term fix: replace with binary packet protocol.
+
+**IWDG reset at exactly the configured timeout = system completely frozen**
+If Renode resets at precisely the watchdog timeout, the firmware is not running at all — HardFault, stack overflow, or infinite loop. Use this as a reliable crash indicator.
+
+**Renode CPU hook syntax**
+`cpu AddHook <addr> "machine.Pause()"` — the hook body must be valid Python. Variable names alone are not valid hook bodies.
+
+**`static` local buffers move data off the task stack**
+A `static char buf[128]` inside a function is allocated in BSS (global memory), not on the stack. Use this for large local buffers in tasks with tight stack budgets.
+
 ---
 
-## Tech Stack
+## C++17 Embedded Restrictions
+
+> These are **absolute rules** for all firmware code on the STM32. Read before every coding session.
+
+| ❌ Never use | Why |
+|---|---|
+| `new` / `delete` | Dynamic heap allocation — heap fragmentation on a system with no memory manager causes unpredictable failures |
+| `malloc` / `free` | Same reason as above |
+| `try` / `catch` / `throw` | No C++ exception runtime exists on bare metal — an unhandled exception calls `std::terminate()` and does nothing useful |
+| `dynamic_cast` / `typeid` | RTTI embeds metadata tables that waste Flash and has runtime overhead |
+| `std::vector`, `std::string`, `std::map` and any STL container that allocates dynamically | All use heap allocation internally |
+| Virtual functions in hot paths | vtable dispatch adds indirection and prevents inlining — avoid in interrupt handlers and tight loops |
+
+> These are **enforced by the compiler** for exceptions and RTTI (`-fno-exceptions -fno-rtti` flags are set). The rest are **discipline constraints** — the compiler will not stop you, you must stop yourself.
+
+---
 
 ### STM32 Side
 | Tool | Purpose |
