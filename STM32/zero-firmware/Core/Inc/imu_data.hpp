@@ -1,11 +1,9 @@
 /**
   ******************************************************************************
-  * File Name          : imu_data.hpp
-  * Description        : Code for IMU data structure definition
+  * @file           : imu_data.hpp
+  * @brief          : Code for IMU data structure definition
   ******************************************************************************
   */
-
-/* Includes ------------------------------------------------------------------*/
 #include <cstdint>
 
 #pragma once
