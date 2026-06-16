@@ -1,0 +1,41 @@
+PROJECT_NAME           = "ZERO"
+PROJECT_BRIEF          = "Dual-node edge AI embedded system — STM32 + Raspberry Pi 4"
+PROJECT_NUMBER         = 0.1
+
+OUTPUT_DIRECTORY       = docs/doxygen
+
+INPUT                  = STM32/zero-firmware/Core \
+                         pi
+RECURSIVE              = YES
+
+FILE_PATTERNS          = *.c \
+                         *.cpp \
+                         *.h \
+                         *.hpp \
+                         *.py
+
+EXCLUDE_PATTERNS       = */stm32f4xx_hal_msp.* \
+                         */stm32f4xx_hal_timebase_tim.* \
+                         */stm32f4xx_hal_conf.* \
+                         */stm32f4xx_it.* \
+                         */system_stm32f4xx.* \
+                         */syscalls.* \
+                         */sysmem.* \
+                         */freertos.* \
+                         */FreeRTOSConfig.* \
+                         */main.*
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+JAVADOC_AUTOBRIEF      = YES
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+
+GENERATE_LATEX         = NO
+
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
