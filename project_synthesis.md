@@ -174,9 +174,10 @@ Defined in the SAD. Implemented in code. Tested against the TEST_SPEC.
 13. **Integration test — normal flow:** mock IMU data flows STM32 → Python parser correctly
 14. **Integration test — UART errors:** trigger framing/overrun in Renode, verify callbacks fire
 15. **Integration test — bad IMU data:** inject out-of-range values, verify rejected before transmission
-16. Containerise Python environment with **Docker** (`docker/pi/Dockerfile`)
-17. Containerise STM32 build environment with **Docker** (`docker/stm32/Dockerfile` — arm-none-eabi-gcc + make)
-18. Set up **GitHub Actions CI** — auto generate doxygen + auto build firmware + run tests on every push, using both containers
+17. Set up CMake — write CMakeLists.txt targeting the ARM toolchain
+18. Containerise Python environment with Docker (docker/pi/Dockerfile)
+19. Containerise STM32 build environment with Docker (docker/stm32/Dockerfile — runs cmake && make)
+20. Set up **GitHub Actions CI** — auto generate doxygen + auto build firmware + run tests on every push, using both containers
 
 **→ End of Phase 1: watch 3Blue1Brown series + implement numpy neural network (see Learning section)**
 
