@@ -4,17 +4,18 @@
 
 ## Progress
 
-| Session | Focus | Status |
+| Day | Focus | Status |
 |---|---|---|
-| Session 1 | Project definition, architecture, phases | ✅ Done |
-| Session 2 | Environment setup (Git, Python venv, STM32CubeIDE, Renode) + CV update | ✅ Done |
-| Session 3 | Phase 1 — CubeMX config, project setup, C++17 build (Milestones 1–3) | ✅ Done |
-| Session 4 | Phase 1 — FreeRTOS tasks, queue, IWDG kick, Renode validation (Milestone 4) | ✅ Done |
-| Session 5 | Phase 1 — Mock IMU data, sanity checks, DMA UART TX with semaphore | ✅ Done |
-| Session 6 | Phase 0 — V-model setup, docs/ folder structure, Doxygen, begin SRS | ⬜ Next |
+| Day 1 | Project definition, architecture, phases | ✅ Done |
+| Day 2 | Environment setup (Git, Python venv, STM32CubeIDE, Renode) + CV update | ✅ Done |
+| Day 3 | Phase 1 — CubeMX config, project setup, C++17 build (Milestones 1–3) | ✅ Done |
+| Day 4 | Phase 1 — FreeRTOS tasks, queue, IWDG kick, Renode validation (Milestone 4) | ✅ Done |
+| Day 5 | Phase 1 — Mock IMU data, sanity checks, DMA UART TX with semaphore | ✅ Done |
+| Session 6 | Phase 0 — V-model setup, docs/ folder, README, SRS functional requirements | ✅ Done |
+| Session 7 | Phase 0 — SRS performance, reliability, observability requirements | ⬜ Next |
 
 **Current phase:** Phase 0 — Specification & Design
-**Next session:** Create docs/ folder, set up Doxygen, begin writing SRS
+**Next session:** Complete SRS — performance, reliability, and observability requirements
 
 ---
 
@@ -28,7 +29,9 @@ When working with Claude Code, always include this at the start of every session
 
 ## What This Project Is
 
-A dual-node embedded AI system made of two cooperating devices: an STM32 microcontroller and a Raspberry Pi 4. The STM32 handles hard real-time sensing and runs a tiny AI model directly on-chip to detect anomalies in motion and vibration data. The Pi handles heavier AI inference using a camera and a microphone. Both devices communicate over UART, and physical actuators (servo/relay) respond to AI decisions.
+A dual-node embedded AI system made of two cooperating devices: an STM32 microcontroller and a Raspberry Pi 4, developed following the V-model cycle with formal specifications, FSMs, and structured testing.
+
+The STM32 handles hard real-time sensing and runs a binary classifier directly on-chip to detect motion events (being picked up, tipping over, falling) and vibration events (strong knock, heavy object placed nearby, strong impact). The Pi handles heavier inference using a camera to recognise hand gestures (thumbs up, thumbs down, open palm) and a microphone to detect spoken keywords ("pause", "start", "stop"). All detections trigger a servo response and are logged to a file. Both nodes communicate over UART.
 
 The project follows the **V-model development cycle** — specification and design precede all implementation, and each test level validates its corresponding design level.
 
@@ -70,6 +73,11 @@ ZERO/
 ├── STM32/
 │   └── zero-firmware/
 ├── pi/
+├── docker/
+│   ├── stm32/
+│   │   └── Dockerfile    ← arm-none-eabi-gcc + make
+│   └── pi/
+│       └── Dockerfile    ← Python + TFLite + all Pi libraries
 └── Doxyfile
 ```
 
@@ -174,10 +182,10 @@ Defined in the SAD. Implemented in code. Tested against the TEST_SPEC.
 13. **Integration test — normal flow:** mock IMU data flows STM32 → Python parser correctly
 14. **Integration test — UART errors:** trigger framing/overrun in Renode, verify callbacks fire
 15. **Integration test — bad IMU data:** inject out-of-range values, verify rejected before transmission
-17. Set up CMake — write CMakeLists.txt targeting the ARM toolchain
-18. Containerise Python environment with Docker (docker/pi/Dockerfile)
-19. Containerise STM32 build environment with Docker (docker/stm32/Dockerfile — runs cmake && make)
-20. Set up **GitHub Actions CI** — auto generate doxygen + auto build firmware + run tests on every push, using both containers
+16. Set up **CMake** — write `CMakeLists.txt` targeting the ARM toolchain so the firmware can be built outside CubeIDE (required for Docker and CI)
+17. Containerise Python environment with **Docker** (`docker/pi/Dockerfile`)
+18. Containerise STM32 build environment with **Docker** (`docker/stm32/Dockerfile` — arm-none-eabi-gcc + cmake + make)
+19. Set up **GitHub Actions CI** — auto build firmware, auto generate Doxygen documentation, and run tests on every push, using both containers
 
 **→ End of Phase 1: watch 3Blue1Brown series + implement numpy neural network (see Learning section)**
 
@@ -190,19 +198,17 @@ Defined in the SAD. Implemented in code. Tested against the TEST_SPEC.
 
 1. Write DDD for Pi vision module, audio module, and inference orchestrator
 2. Write TEST_SPEC entries for all Phase 2 requirements
-3. Collect or download an image classification dataset (start simple: 2–3 classes)
-4. Train a first CNN from scratch in Keras — understand each layer: convolutional, pooling, dense
-5. Export trained model to TensorFlow Lite (.tflite)
-6. Run TFLite inference in Python, measure and log latency on every run
-7. Validate inference inputs before feeding model — check shape, dtype, value range
-8. Fine-tune pretrained MobileNetV2 on custom data — understand what transfer learning does and why
-9. Build audio classification pipeline: record audio → mel spectrogram → CNN → inference
-10. Implement Pi Inference FSM in orchestrator
-11. Connect full Pi-side pipeline to emulated STM32 over virtual UART
-12. **Unit test — vision pipeline:** correct classifications on held-out images, latency within budget
-13. **Unit test — audio pipeline:** correct sound classifications, latency within budget
-14. **Unit test — edge cases:** all zeros, max values, NaN — pipeline must not crash
-15. **Integration test:** Pi detects event → UART message → emulated STM32 receives and acknowledges
+3. Train a CNN from scratch in Keras for hand gesture recognition — 3 classes: thumbs up, thumbs down, open palm
+4. Export trained model to TensorFlow Lite (.tflite)
+5. Run TFLite inference in Python, measure and log latency on every run
+6. Validate inference inputs before feeding model — check shape, dtype, value range
+7. Build audio keyword detection pipeline: record audio → mel spectrogram → CNN → inference — 3 keywords: "pause", "start", "stop"
+8. Implement Pi Inference FSM in orchestrator
+9. Connect full Pi-side pipeline to emulated STM32 over virtual UART
+10. **Unit test — vision pipeline:** correct gesture classifications on held-out images, latency within budget
+11. **Unit test — audio pipeline:** correct keyword detections on held-out recordings, latency within budget
+12. **Unit test — edge cases:** all zeros, max values, NaN — pipeline must not crash
+13. **Integration test:** Pi detects event → UART message → emulated STM32 receives and acknowledges
 
 ---
 
@@ -213,17 +219,17 @@ Defined in the SAD. Implemented in code. Tested against the TEST_SPEC.
 
 1. Write DDD for STM32 inference module — model architecture, memory layout, inference budget
 2. Write TEST_SPEC entries for all Phase 3 requirements
-3. Generate IMU dataset via Renode — script normal and anomalous sequences (drift, spike, freeze)
-4. Train autoencoder on normal IMU data only — model learns what "normal" looks like
-5. Validate autoencoder: reconstructs normal well, produces high error on anomalies
-6. Quantize model from float32 to int8
+3. Generate labeled IMU dataset via Renode — script normal sequences and detection sequences for each event type (motion: being picked up, tipping over, falling / vibration: strong knock, heavy object, strong impact)
+4. Train binary classifiers on labeled IMU data — one for motion events, one for vibration events
+5. Validate classifiers: ≥ 90% accuracy on held-out test dataset per SRS requirements
+6. Quantize models from float32 to int8
 7. Compare float32 vs int8 output on same inputs — measure and document accuracy loss
-8. Port quantized model to TFLite Micro, integrate into STM32 C++17 firmware
-9. Verify model fits in Flash, inference buffers fit in RAM
+8. Port quantized models to TFLite Micro, integrate into STM32 C++17 firmware
+9. Verify models fit in Flash, inference buffers fit in RAM
 10. Measure worst-case inference time on emulated STM32 — must meet real-time deadline from DDD
 11. **Unit test — quantization:** accuracy loss within acceptable bounds defined in TEST_SPEC
 12. **Unit test — inference timing:** worst-case execution time within budget
-13. **Integration test — synthetic sequences:** normal, drift, spike, freeze — verify FSM transitions correctly
+13. **Integration test — synthetic sequences:** normal, detection events — verify FSM transitions correctly
 14. **Integration test — UART failure:** simulate mid-session disconnect, verify STM32 recovers without hang
 
 ---
@@ -338,6 +344,7 @@ A `static char buf[128]` inside a function is allocated in BSS (global memory), 
 | C++17 | Primary language (avoid: new/delete, exceptions, RTTI, dynamic STL) |
 | STM32CubeMX | Standalone peripheral configurator — owns the `.ioc` file, generates code |
 | STM32CubeIDE | IDE + compiler (arm-none-eabi-gcc) — application code, build, debug, flash |
+| CMake | Cross-platform build system — enables Docker and CI builds outside CubeIDE |
 | STM32 HAL | Hardware abstraction (UART, I2C, DMA, timers) |
 | FreeRTOS | Real-time operating system |
 | TensorFlow Lite Micro | On-chip AI inference |
@@ -418,11 +425,13 @@ Once you've written this by hand, every TensorFlow abstraction will mean somethi
 | FSM design and implementation | Phase 0 (spec) + Phase 1–3 (implementation) |
 | Requirements engineering | Phase 0, SRS writing |
 | Neural networks (math) | 3Blue1Brown + numpy exercise |
-| CNNs + transfer learning | Phase 2, image classification |
-| Spectrograms + audio CNNs | Phase 2, sound classification |
-| Model quantization (float32 → int8) | Phase 3, fitting model on STM32 |
+| Binary classification | Phase 2 + 3, all detection models |
+| CNNs trained from scratch | Phase 2, gesture and keyword detection |
+| Spectrograms + audio CNNs | Phase 2, keyword detection pipeline |
+| Model quantization (float32 → int8) | Phase 3, fitting models on STM32 |
 | TensorFlow Lite Micro | Phase 3, on-chip inference |
-| Autoencoders + anomaly detection | Phase 3, IMU data |
 | Hard real-time constraints | Phase 1 + 3, FreeRTOS + deadlines |
 | DMA + interrupt-driven design | Phase 1, STM32 firmware |
 | Edge AI architecture | Throughout — where to put the intelligence |
+| CMake for embedded cross-compilation | Phase 1, build system setup |
+| Docker for reproducible builds | Phase 1, containerised environments |
