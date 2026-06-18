@@ -11,11 +11,17 @@
 
 ## 1. Purpose
 
-Define system requirement without going into technical details.
+This document defines the system-level requirements for the ZERO embedded AI 
+system. It serves as the reference against which all implementation and testing 
+decisions are validated.
 
 ## 2. Scope
 
-This system monitors vibrations, movement, visuals and audio to detect anomalies, make decisions according to data, and interact with actuators according to decisions made.
+The system monitors motion, vibrations, hand gestures, and spoken keywords to 
+detect predefined events and trigger a physical servo response. All detection 
+events are logged to files accessible to the operator. This document covers 
+system behaviour only — architecture, implementation, and test procedures are 
+defined in separate documents.
 
 ## 3. Definitions
 
